@@ -1,12 +1,43 @@
+import axios from "axios";
+import { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import { NavLink } from "react-router";
+import useSWR from "swr";
 
 const Navbar = () => {
+  let [token,setToken]=useState("");
 
-  // let prod = useSelector((state) => console.log(state?.products?.products))
-  let Product= useSelector((state) => state.Products?.products)
-  // state.Products here Products from store.js and then products which is array of products in Productslice.
-     
+  let Product = useSelector((state) => state.Products?.products);
+
+    useEffect(()=>{
+ const token = JSON.parse(localStorage.getItem("token"));
+
+setToken(token);
+  },[])
+  const fetcher = async (url) => {
+    try {
+      const token = JSON.parse(localStorage.getItem("token"));
+      const { data } = await axios.get(url, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      console.log(data);
+      console.log(data)
+      return data?.data || [];
+    } catch (err) {
+      console.log(err);
+      return [];
+    }
+  };
+
+
+  const { data: productsDb, error: usersError } = useSWR(
+    token ? "https://farming-website-backend.onrender.com/cart" : null,
+  fetcher
+  );
+  const productCount = Array.isArray(productsDb) ? productsDb.length : 0;
+          console.log(productCount)
   return (
     <>
       <div className="header">
@@ -78,16 +109,40 @@ const Navbar = () => {
             </li>
             <li>
               <NavLink
-                to="/Cart"
+                to="/cart"
                 style={({ isActive }) => ({
                   borderBottom: isActive ? "2px solid white" : "",
                 })}
               >
-                <span className="material-symbols-outlined">shopping_cart{Product.length}</span>
+                <span className="material-symbols-outlined">
+                  shopping_cart{productCount}
+                </span>
               </NavLink>
             </li>
           </ul>
         </nav>
+        <ul className="auth_section">
+          <li>
+            <NavLink
+              to="/login"
+              style={({ isActive }) => ({
+                borderBottom: isActive ? "2px solid white" : "",
+              })}
+            >
+              Login
+            </NavLink>
+          </li>
+          <li>
+            <NavLink
+              to="/signup"
+              style={({ isActive }) => ({
+                borderBottom: isActive ? "2px solid white" : "",
+              })}
+            >
+              Signup
+            </NavLink>
+          </li>
+        </ul>
       </div>
     </>
   );

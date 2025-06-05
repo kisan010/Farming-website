@@ -7,11 +7,11 @@ const Productslice = createSlice({
   },
   reducers: {
     addSeed: (state, action) => {
-      console.log(state, action);
+      // console.log(state, action);
            let existingProduct=  state.products.find(item=>item.name===action.payload.name);
            if(existingProduct)
            {
-             existingProduct.count=existingProduct.count+action.payload.count
+             existingProduct.quantity=existingProduct.quantity+action.payload.count
            }
            else{
             state.products.push(action.payload)
@@ -19,7 +19,7 @@ const Productslice = createSlice({
     },
     removeSeed: (state, action) => {
       state.products = state.products.filter((item) => {
-        return item.id !== action.payload;
+        return item._id !== action.payload;
       });
     },
   },

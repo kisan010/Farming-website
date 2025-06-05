@@ -13,54 +13,108 @@ import { faApple } from "@fortawesome/free-brands-svg-icons";
 import { useDispatch } from "react-redux";
 import { addSeed } from "../../Redux/Productslice";
 import { toast } from "react-toastify";
+import useSWR, { mutate } from "swr";
+import axios from "axios";
+
 
 const Products = () => {
   const [products, setProducts] = useState([]);
   let dispatch = useDispatch();
 
-  useEffect(() => {
-    async function fetchProducts() {
-      try {
-        const response = await fetch("/api/Products.json");
-        
-      if (!response.ok) throw new Error("Failed to load products");
-
-      const data = await response.json();
-      setProducts(data || []);
-      } catch (error) {
-        console.error("Error fetching products:", error);
-      }
+  async function fetcher(url) {
+    try {
+      let { data } = await axios.get(url);
+      return data;
+    } catch (err) {
+      console.log(err);
+      return null;
     }
-    fetchProducts();
-  }, []);
+  }
+  let allProductdata = useSWR("https://farming-website-backend.onrender.com/product", fetcher);
 
-  // Function to increase product count
+  useEffect(() => {
+    setProducts(allProductdata?.data?.data);
+  }, [allProductdata.data]);
+
+  console.log(products)
   const increaseCount = (id) => {
-     setProducts(products.map((item)=>{
-          return item.id===id ? {...item,count:item.count+1}:item
-     }))
-  };
-
-  // Function to decrease product count
-  const decreaseCount = (id) => {
     setProducts(
       products.map((item) => {
-        return item.id === id && item.count >1 ? { ...item, count: item.count-1 } : item;
+        return item._id === id
+          ? { ...item, quantity: item.quantity + 1,price: item.price + (item.price / item.quantity)}
+          : item;
       })
     );
   };
-  function handleaddProduct(item, e) {
-    toast(`${item.name} added to cart`,{
-            autoClose: 3000,  
-            hideProgressBar: false,
-            closeOnClick: true,
-            theme: "light",
-    })
-    dispatch(addSeed(item));
-    
+
+  const decreaseCount = (id) => {
+    setProducts(
+      products.map((item) => {
+        return item._id === id && item.quantity > 1
+          ? { ...item, quantity: item.quantity - 1 ,price:item.price-(item.price/item.quantity)}
+          : item;
+      })
+    );
+  };
+  async function handleaddProduct(item, e) {
+   
+       let token = JSON.parse(localStorage.getItem('token'));
+     if (!token) {
+    toast("You need to log in to add items to cart", {
+      autoClose: 3000,
+      hideProgressBar: false,
+      closeOnClick: true,
+      theme: "light",
+    });
+    return;
+  }
+    try {
+      const response = await axios.get("https://farming-website-backend.onrender.com/cart", { headers: { Authorization: `Bearer ${token}`, }, });
+      console.log(response)
+      const cartItems = response.data.data;
+
+      if (!Array.isArray(cartItems)) {
+        console.error("cartItems is not an array:", cartItems);
+        return;
+      }
+
+      const existingProduct = cartItems.find(
+        (product) => product.name === item.name
+      );
+      if (existingProduct) {
+        await axios.put(
+          `https://farming-website-backend.onrender.com/cart/${existingProduct._id}`,
+          {
+            quantity: item.quantity,
+            price: item.price,
+          },
+          {headers: { Authorization: `Bearer ${token}`, },  }
+        );
+      mutate("https://farming-website-backend.onrender.com/cart"); 
+    } else {
+        await axios.post("https://farming-website-backend.onrender.com/cart", {
+          name: item.name,
+          quantity:item.quantity,
+          icon: item.icon,
+          price: item.price ,
+        },
+        {headers: { Authorization: `Bearer ${token}`, }, },);
+      }
+
+      dispatch(addSeed(item));
+      toast(`${item.name} added to cart`, {
+        autoClose: 3000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        theme: "light",
+      });
+
+      mutate("https://farming-website-backend.onrender.com/cart");
+    } catch (err) {
+      console.log(err);
+    }
   }
 
-  // Map icon names to actual FontAwesome icons
   const iconLookup = {
     faPepperHot: faPepperHot,
     faSeedling: faSeedling,
@@ -77,34 +131,42 @@ const Products = () => {
         <section className="productpage section">
           <h1>Product Section</h1>
           <div className="products_container">
-            {products.map((item) => (
-              <div className="box" id={`box-${item.id}`} key={item.id}>
-                <div className="about_product">
-                  <div className="iconcls">
-                    <FontAwesomeIcon icon={iconLookup[item.icon]} />
+            {!products ? (
+              <h3>Loading...</h3>
+            ) : (
+              products?.map((item) => (
+                <div className="box" id={`box-${item._id}`} key={item._id}>
+                  <div className="about_product">
+                    <div className="iconcls">
+                      <FontAwesomeIcon icon={iconLookup[item.icon]} />
+                    </div>
+                    <div>
+                      <h3>{item.name}</h3>
+                    </div>
+                    <div className="text_container">
+                      <p>{item.description}</p>
+                    </div>
+                    <div className="price">
+                      <div>
+                        <button onClick={() => increaseCount(item._id)}>
+                          +
+                        </button>
+                        <span>{item.quantity}</span>
+                        <button onClick={() => decreaseCount(item._id)}>
+                          -
+                        </button>
+                      </div>
+                      <div>{item.price }$</div>
+                    </div>
                   </div>
                   <div>
-                    <h3>{item.name}</h3>
-                  </div>
-                  <div className="text_container">
-                    <p>{item.about}</p>
-                  </div>
-                  <div className="price">
-                    <div>
-                      <button onClick={() => increaseCount(item.id)}>+</button>
-                      <span>{item.count}</span>
-                      <button onClick={() => decreaseCount(item.id)}>-</button>
-                    </div>
-                    <div>{item.price * item.count}$</div>
+                    <button onClick={(e) => handleaddProduct(item, e)}>
+                      Add to Cart
+                    </button>
                   </div>
                 </div>
-                <div>
-                  <button onClick={(e) => handleaddProduct(item, e)}>
-                    Add to Cart
-                  </button>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </section>
       </main>
